@@ -71,7 +71,7 @@ scripts/daily.mjs                     ← 任务脚本
 1. 打开仓库 → **Settings** → 左侧 **Secrets and variables** → **Actions**
 2. 点 **New repository secret**
 3. **Name** 填：`GITCODE_COOKIE`
-4. **Secret** 填：本机文件 `C:\Users\fafa\.workbuddy\gitcode-cookie.txt` 的**全部内容**（一整行，前后不要有空格或换行）
+4. **Secret** 填：本机文件 `%USERPROFILE%\.workbuddy\gitcode-cookie.txt` 的**全部内容**（一整行，前后不要有空格或换行）
 
 > 说明：Secret 内容会被 GitHub 加密存储，且**在运行日志中自动打码**，即使工作流输出了它也会显示成 `***`。
 > 另外 fork 出去的仓库读不到这个 Secret。
