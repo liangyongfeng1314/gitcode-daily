@@ -1,0 +1,35 @@
+name: Keepalive
+
+# 为什么需要它：GitHub 会自动禁用「60 天内没有任何仓库活动」的定时工作流。
+# 定时任务本身的运行不算仓库活动，必须有 commit/push 才算。
+# 这个工作流每月自动提交一次时间戳，让主任务永远不会被静默停掉。
+on:
+  schedule:
+    - cron: '0 3 1 * *'     # 每月 1 号 UTC 03:00（北京时间 11:00）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 提交心跳时间戳
+        run: |
+          set -euo pipefail
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .keepalive
+          if git diff --staged --quiet; then
+            echo "内容无变化，跳过提交"
+          else
+            git commit -m "chore: keepalive $(date -u +%Y-%m-%d)"
+            git push
+            echo "已提交心跳，定时工作流保持启用"
+          fi

@@ -1,0 +1,61 @@
+name: GitCode 每日任务
+
+# 定时说明：GitHub 的定时任务用 UTC，且排队执行、常延迟 15~60 分钟（整点最拥堵）。
+# 这里取 UTC 01:20 = 北京时间 09:20，刻意避开整点，让实际执行落在 09:20~10:20 之间。
+# 签到不要求精确到分钟，因此延迟无影响。
+on:
+  schedule:
+    - cron: '20 1 * * *'
+  workflow_dispatch:        # 也可在网页上点 "Run workflow" 立即手动跑一次
+
+permissions:
+  contents: read
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # 通过环境变量把 Secret 传给 shell（比直接插值进脚本更安全，避免注入）
+      - name: 写入 Cookie
+        env:
+          COOKIE: ${{ secrets.GITCODE_COOKIE }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/creds"
+          printf '%s' "$COOKIE" > "$RUNNER_TEMP/creds/gitcode-cookie.txt"
+          if [ ! -s "$RUNNER_TEMP/creds/gitcode-cookie.txt" ]; then
+            echo "::error::Secret GITCODE_COOKIE 为空。请到 Settings → Secrets and variables → Actions 配置后再运行。"
+            exit 1
+          fi
+          echo "Cookie 已写入，长度 $(wc -c < "$RUNNER_TEMP/creds/gitcode-cookie.txt") 字节"
+
+      # --no-refresh：CI 里没有浏览器配置目录，跳过"自取 Cookie"，直接用上一步注入的凭据
+      # --no-browser：CI 里没有浏览器，跳过 task 59 的浏览器辅助步骤（不影响签到/Star/领奖）
+      # set -o pipefail：确保脚本非 0 退出时这一步真的标记为失败，不被 tee 掩盖
+      - name: 执行每日任务
+        env:
+          GITCODE_COOKIE_FILE: ${{ runner.temp }}/creds/gitcode-cookie.txt
+        run: |
+          set -o pipefail
+          node scripts/daily.mjs --no-refresh --no-browser 2>&1 | tee "$RUNNER_TEMP/out.txt"
+
+      - name: 把结果写进运行摘要
+        if: always()
+        run: |
+          {
+            echo "## GitCode 每日任务结果"
+            echo ""
+            echo '```'
+            cat "$RUNNER_TEMP/out.txt" 2>/dev/null || echo "（未捕获到输出）"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

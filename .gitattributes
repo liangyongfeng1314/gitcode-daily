@@ -1,0 +1,4 @@
+# 统一按 LF 存储与检出。
+# 原因：workflow 的 run 段会被 GitHub 写成 shell 脚本在 Linux runner 上执行，
+# 若行尾是 CRLF，bash 会把 \r 当成命令的一部分而报错（如 "$'\r': command not found"）。
+* text=auto eol=lf
