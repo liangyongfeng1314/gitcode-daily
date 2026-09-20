@@ -49,6 +49,12 @@ const H = {
 
 const notes = [];   // 非致命提示（会并入报告）
 function loadCookie() {
+  // 无文件系统的运行环境（云函数）可由入口代码把凭据写入 GITCODE_COOKIE 环境变量。
+  // 本机与 GitHub Actions 不设该变量，继续走文件逻辑，行为不变。
+  if (process.env.GITCODE_COOKIE) {
+    H['Cookie'] = process.env.GITCODE_COOKIE.trim();
+    return;
+  }
   H['Cookie'] = existsSync(cookieFile) ? readFileSync(cookieFile, 'utf8').trim() : '';
 }
 
@@ -98,9 +104,10 @@ if (!NO_REFRESH) {
   const r0 = refreshCookie();
   if (r0 !== 'OK') notes.push('自取 Cookie 未成功（' + r0 + '），本次沿用现有 Cookie 文件。');
 }
-if (!existsSync(cookieFile)) {
-  console.error('[ERROR] Cookie 文件不存在: ' + cookieFile);
-  console.error('请运行 scripts/gitcode-login.bat 登录一次，或手动复制 Cookie 保存到该路径。');
+if (!process.env.GITCODE_COOKIE && !existsSync(cookieFile)) {
+  console.error('[ERROR] 未提供凭据：GITCODE_COOKIE 环境变量为空，且 Cookie 文件不存在: ' + cookieFile);
+  console.error('本机：运行 scripts/gitcode-login.bat 登录一次，或手动复制 Cookie 保存到该路径。');
+  console.error('云函数：在控制台为云函数配置 GITCODE_COOKIE_1 / GITCODE_COOKIE_2 环境变量（Cookie 超过单值 1024 字符上限，需分段）。');
   process.exit(2);
 }
 loadCookie();
@@ -124,6 +131,10 @@ if (st.status !== 200 || !st.text.trim()) {
     lines.push('当前在 GitHub Actions 中运行 —— Secret 里的 GITCODE_COOKIE 已失效（本机 Cookie 更新后未同步）。');
     lines.push('修复：在本机执行 node scripts/sync-secret.mjs --force 把最新 Cookie 同步上去。');
     lines.push('（本机每日任务是自动同步的；若同步后仍失败，说明本机 Cookie 也需重新登录一次。）');
+  } else if (process.env.GITCODE_ENV === 'unicloud') {
+    lines.push('当前在 uniCloud 云函数中运行 —— 环境变量里的凭据已失效（本机 Cookie 更新后未同步）。');
+    lines.push('修复：uniCloud 控制台 → 云函数/云对象 → gitcode-daily → 环境变量，把 GITCODE_COOKIE_1 / _2 更新为最新 Cookie 的分段值。');
+    lines.push('（本机每日任务只自动同步 GitHub Secret；uniCloud 环境变量需手动更新一次，约每 30 天一次。）');
   } else {
     lines.push('请重新从浏览器复制 Cookie 并更新 ' + cookieFile + '，或运行 scripts/gitcode-login.bat 登录一次。');
   }
