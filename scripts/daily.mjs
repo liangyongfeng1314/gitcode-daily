@@ -115,8 +115,18 @@ if ((st.status !== 200 || !st.text.trim()) && !NO_REFRESH) {
   else notes.push('鉴权失败后自动重新获取 Cookie 也失败（' + r1 + '）。');
 }
 if (st.status !== 200 || !st.text.trim()) {
-  lines.push('签到状态查询失败（Cookie 可能已过期）。');
-  lines.push('请重新从浏览器复制 Cookie 并更新 ' + cookieFile + '，或运行 scripts/gitcode-login.bat 登录一次。');
+  // 云端（GitHub Actions）与本机的失效原因不同：云端用的是 Secret 里的静态快照，
+  // 一旦本机 Cookie 被刷新，云端那份就会过期。给出各自可执行的修复路径。
+  // 同时输出 HTTP 状态码 —— 用于区分「凭据过期」（401/403）与「网络抖动」（0/超时）。
+  lines.push('签到状态查询失败（HTTP ' + st.status + (st.status === 0 ? ' ＝ 网络错误' : '') + '）。');
+  lines.push('响应摘要: ' + ((st.text || '(空响应)').trim().slice(0, 200)));
+  if (process.env.GITHUB_ACTIONS) {
+    lines.push('当前在 GitHub Actions 中运行 —— Secret 里的 GITCODE_COOKIE 已失效（本机 Cookie 更新后未同步）。');
+    lines.push('修复：在本机执行 node scripts/sync-secret.mjs --force 把最新 Cookie 同步上去。');
+    lines.push('（本机每日任务是自动同步的；若同步后仍失败，说明本机 Cookie 也需重新登录一次。）');
+  } else {
+    lines.push('请重新从浏览器复制 Cookie 并更新 ' + cookieFile + '，或运行 scripts/gitcode-login.bat 登录一次。');
+  }
   console.log(lines.join('\n'));
   process.exit(1);
 }
